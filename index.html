@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Genre Classifier</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f4f4f4;
+            --text-color: #333;
+            --card-background: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--background-color);
+            background-image: url('img/bgimg.jpg'); /* Đặt hình nền từ thư mục img */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            line-height: 1.6;
+            color: var(--text-color);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Tạo các nốt nhạc xoay quanh trục Y */
+        .music-notes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Đảm bảo các nốt nhạc không chặn các phần tử khác */
+            z-index: -1; /* Đặt nốt nhạc ở dưới */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .music-note {
+            font-size: 4rem; /* Tạo kích thước cho các nốt nhạc */
+            color: rgba(255, 255, 255, 0.6); /* Màu sắc nốt nhạc với độ trong suốt */
+            position: absolute;
+            animation: rotateAroundY 4s infinite linear; /* Xoay quanh trục Y */
+        }
+
+        /* Xoay quanh trục Y tại vị trí cố định */
+        @keyframes rotateAroundY {
+            0% {
+                transform: rotateY(0deg);
+            }
+            100% {
+                transform: rotateY(360deg);
+            }
+        }
+
+        .container {
+            background-color: var(--card-background);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+            text-align: center;
+            z-index: 1; /* Đảm bảo hộp thoại nằm trên các nốt nhạc */
+            position: relative;
+        }
+
+        .title {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+
+        #file-upload {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .file-label:hover {
+            background-color: #2980b9;
+        }
+
+        #selected-file {
+            margin-bottom: 20px;
+            color: var(--secondary-color);
+        }
+
+        #upload-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #upload-btn:hover {
+            background-color: #27ae60;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f0f0f0;
+        }
+
+        .loading {
+            display: none;
+            color: var(--primary-color);
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="music-notes">
+        <!-- Các nốt nhạc sẽ được thêm vào với vị trí ngẫu nhiên -->
+    </div>
+
+    <div class="container">
+        <h1 class="title">🎵 Music Genre Classifier</h1>
+        
+        <input type="file" id="file-upload" accept=".wav,.mp3,.ogg" />
+        <label for="file-upload" class="file-label">
+            Choose Audio File
+        </label>
+        
+        <div id="selected-file"></div>
+        
+        <button id="upload-btn" disabled>Classify Genre</button>
+        
+        <div class="loading" id="loading">
+            Classifying... Please wait
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const fileUpload = document.getElementById('file-upload');
+        const selectedFileDisplay = document.getElementById('selected-file');
+        const uploadBtn = document.getElementById('upload-btn');
+        const resultDiv = document.getElementById('result');
+        const loadingDiv = document.getElementById('loading');
+        
+        // API endpoint configuration
+        const API_ENDPOINT = 'http://localhost:8000';
+
+        // File selection handling
+        fileUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFileDisplay.textContent = `Selected: ${file.name}`;
+                uploadBtn.disabled = false;
+            }
+        });
+
+        // Upload and classification
+        uploadBtn.addEventListener('click', async function() {
+            const file = fileUpload.files[0];
+            if (!file) return;
+
+            // Reset previous results
+            resultDiv.innerHTML = '';
+            loadingDiv.style.display = 'block';
+            uploadBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Predict genre
+                const response = await fetch(`${API_ENDPOINT}/predict/`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Genre classification failed');
+                }
+
+                const result = await response.json();
+
+                // Display results
+                resultDiv.innerHTML = `
+                    <h3>Prediction Results</h3>
+                    <p><strong>Genre:</strong> ${result.genre.toUpperCase()}</p>
+                    <p><strong>Confidence:</strong> ${(result.confidence * 100).toFixed(2)}%</p>
+                `;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            } finally {
+                loadingDiv.style.display = 'none';
+                uploadBtn.disabled = false;
+            }
+        });
+
+        // Generate random positions for music notes
+        function generateRandomNotes() {
+            const notesContainer = document.querySelector('.music-notes');
+            const notes = ['🎶', '🎵', '🎶', '🎵', '🎶', '🎵', '🎶', '🎵'];
+
+            notes.forEach((note) => {
+                const noteElement = document.createElement('div');
+                noteElement.classList.add('music-note');
+                noteElement.innerText = note;
+                
+                // Set random position within the window
+                noteElement.style.left = `${Math.random() * 100}vw`;
+                noteElement.style.top = `${Math.random() * 100}vh`;
+
+                // Add the note to the container
+                notesContainer.appendChild(noteElement);
+            });
+        }
+
+        // Generate the random notes when the page loads
+        window.onload = generateRandomNotes;
+    </script>
+</body>
+</html>
